@@ -41,28 +41,33 @@ func main() {
 				Aliases: []string{"t"},
 				Value:   "poet.txt",
 				Usage:   "Names file",
+				EnvVars: []string{"POETBOT_TXTFILE"},
 			},
 			&cli.StringFlag{
 				Name:    "cron",
 				Aliases: []string{"c"},
 				Value:   "@every 30s",
 				Usage:   "Update crontab",
+				EnvVars: []string{"POETBOT_CRON"},
 			},
 			&cli.StringFlag{
 				Name:    "data",
 				Aliases: []string{"d"},
 				Value:   "data",
 				Usage:   "Data storage dir",
+				EnvVars: []string{"POETBOT_DATA"},
 			},
 			&cli.StringFlag{
 				Name:     "appid",
 				Usage:    "Telegram app id",
 				Required: true,
+				EnvVars:  []string{"POETBOT_APPID"},
 			},
 			&cli.StringFlag{
 				Name:     "apphash",
 				Usage:    "Telegram app hash",
 				Required: true,
+				EnvVars:  []string{"POETBOT_APPHASH"},
 			},
 			&cli.BoolFlag{
 				Name:  "debug",
