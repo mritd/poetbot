@@ -53,4 +53,4 @@ RUN set -ex \
 
 VOLUME /data
 
-CMD ["poetbot"]
+ENTRYPOINT ["poetbot"]
