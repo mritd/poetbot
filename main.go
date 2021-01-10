@@ -24,7 +24,6 @@ var (
 )
 
 func main() {
-
 	app := &cli.App{
 		Name:    "poetbot",
 		Usage:   "Telegram auto update name bot",
@@ -83,7 +82,6 @@ func main() {
 	if err != nil {
 		logger.Error(err)
 	}
-
 }
 
 func update(c *cli.Context) error {
