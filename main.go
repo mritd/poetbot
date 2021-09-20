@@ -3,6 +3,9 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/Arman92/go-tdlib/client"
+	"github.com/Arman92/go-tdlib/tdlib"
+	"github.com/sirupsen/logrus"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -12,8 +15,6 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/Arman92/go-tdlib"
-	"github.com/mritd/logger"
 	"github.com/urfave/cli/v2"
 )
 
@@ -77,15 +78,19 @@ func main() {
 		},
 		Before: func(c *cli.Context) error {
 			if c.Bool("debug") {
-				logger.SetDevelopment()
+				logrus.SetLevel(logrus.DebugLevel)
 			}
+			logrus.SetFormatter(&logrus.TextFormatter{
+				FullTimestamp:   true,
+				TimestampFormat: "2006-01-02 15:04:05",
+			})
 			return nil
 		},
 		Action: update,
 	}
 	err := app.Run(os.Args)
 	if err != nil {
-		logger.Error(err)
+		logrus.Error(err)
 	}
 }
 
@@ -107,10 +112,10 @@ func update(c *cli.Context) error {
 		data = append(data, line)
 	}
 
-	tdlib.SetLogVerbosityLevel(1)
-	tdlib.SetFilePath(os.Stdout.Name())
+	client.SetLogVerbosityLevel(1)
+	client.SetFilePath(os.Stdout.Name())
 	// Create new instance of client
-	client := tdlib.NewClient(tdlib.Config{
+	tdCli := client.NewClient(client.Config{
 		APIID:               c.String("appid"),
 		APIHash:             c.String("apphash"),
 		SystemLanguageCode:  "en",
@@ -125,34 +130,34 @@ func update(c *cli.Context) error {
 	})
 
 	for {
-		currentState, _ := client.Authorize()
+		currentState, _ := tdCli.Authorize()
 		switch currentState.GetAuthorizationStateEnum() {
 		case tdlib.AuthorizationStateWaitPhoneNumberType:
 			fmt.Print("Enter phone: ")
 			var number string
 			_, _ = fmt.Scanln(&number)
-			_, err := client.SendPhoneNumber(number)
+			_, err := tdCli.SendPhoneNumber(number)
 			if err != nil {
-				logger.Errorf("Error sending phone number: %v", err)
+				logrus.Errorf("Error sending phone number: %v", err)
 			}
 		case tdlib.AuthorizationStateWaitCodeType:
 			fmt.Print("Enter code: ")
 			var code string
 			_, _ = fmt.Scanln(&code)
-			_, err := client.SendAuthCode(code)
+			_, err := tdCli.SendAuthCode(code)
 			if err != nil {
-				logger.Errorf("Error sending auth code : %v", err)
+				logrus.Errorf("Error sending auth code : %v", err)
 			}
 		case tdlib.AuthorizationStateWaitPasswordType:
 			fmt.Print("Enter Password: ")
 			var password string
 			_, _ = fmt.Scanln(&password)
-			_, err := client.SendAuthPassword(password)
+			_, err := tdCli.SendAuthPassword(password)
 			if err != nil {
-				logger.Errorf("Error sending auth password: %v", err)
+				logrus.Errorf("Error sending auth password: %v", err)
 			}
 		case tdlib.AuthorizationStateReadyType:
-			logger.Info("Authorization Ready! Let's rock")
+			logrus.Info("Authorization Ready! Let's rock")
 			goto AuthSuccess
 		}
 	}
@@ -163,10 +168,10 @@ AuthSuccess:
 	_, err = cn.AddFunc(c.String("cron"), func() {
 		rand.Seed(time.Now().Unix())
 		name := data[rand.Intn(len(data)-1)]
-		logger.Infof("update name to [%s]...", name)
-		_, err := client.SetName(name, "")
+		logrus.Infof("update name to [%s]...", name)
+		_, err := tdCli.SetName(name, "")
 		if err != nil {
-			logger.Error(err)
+			logrus.Error(err)
 		}
 	})
 	if err != nil {
@@ -174,7 +179,7 @@ AuthSuccess:
 	}
 
 	cn.Start()
-	logger.Info("Poet Bot running...")
+	logrus.Info("Poet Bot running...")
 
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
