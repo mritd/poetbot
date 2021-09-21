@@ -3,9 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/Arman92/go-tdlib/client"
-	"github.com/Arman92/go-tdlib/tdlib"
 	"github.com/sirupsen/logrus"
+	"github.com/zelenin/go-tdlib/client"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -58,7 +57,7 @@ func main() {
 				Usage:   "Data storage dir",
 				EnvVars: []string{"POETBOT_DATA"},
 			},
-			&cli.StringFlag{
+			&cli.IntFlag{
 				Name:     "appid",
 				Usage:    "Telegram app id",
 				Required: true,
@@ -112,64 +111,61 @@ func update(c *cli.Context) error {
 		data = append(data, line)
 	}
 
-	client.SetLogVerbosityLevel(1)
-	client.SetFilePath(os.Stdout.Name())
-	// Create new instance of client
-	tdCli := client.NewClient(client.Config{
-		APIID:               c.String("appid"),
-		APIHash:             c.String("apphash"),
-		SystemLanguageCode:  "en",
-		DeviceModel:         "Server",
-		SystemVersion:       "1.0.0",
-		ApplicationVersion:  "1.0.0",
-		UseMessageDatabase:  true,
-		UseFileDatabase:     true,
-		UseChatInfoDatabase: true,
-		DatabaseDirectory:   filepath.Join(c.String("data"), "tdlib-db"),
-		FileDirectory:       filepath.Join(c.String("data"), "tdlib-files"),
-	})
+	// client authorizer
+	authorizer := client.ClientAuthorizer()
+	go client.CliInteractor(authorizer)
 
-	for {
-		currentState, _ := tdCli.Authorize()
-		switch currentState.GetAuthorizationStateEnum() {
-		case tdlib.AuthorizationStateWaitPhoneNumberType:
-			fmt.Print("Enter phone: ")
-			var number string
-			_, _ = fmt.Scanln(&number)
-			_, err := tdCli.SendPhoneNumber(number)
-			if err != nil {
-				logrus.Errorf("Error sending phone number: %v", err)
-			}
-		case tdlib.AuthorizationStateWaitCodeType:
-			fmt.Print("Enter code: ")
-			var code string
-			_, _ = fmt.Scanln(&code)
-			_, err := tdCli.SendAuthCode(code)
-			if err != nil {
-				logrus.Errorf("Error sending auth code : %v", err)
-			}
-		case tdlib.AuthorizationStateWaitPasswordType:
-			fmt.Print("Enter Password: ")
-			var password string
-			_, _ = fmt.Scanln(&password)
-			_, err := tdCli.SendAuthPassword(password)
-			if err != nil {
-				logrus.Errorf("Error sending auth password: %v", err)
-			}
-		case tdlib.AuthorizationStateReadyType:
-			logrus.Info("Authorization Ready! Let's rock")
-			goto AuthSuccess
-		}
+	authorizer.TdlibParameters <- &client.TdlibParameters{
+		UseTestDc:              false,
+		DatabaseDirectory:      filepath.Join(c.String("data"), "tdlib-db"),
+		FilesDirectory:         filepath.Join(c.String("data"), "tdlib-files"),
+		UseFileDatabase:        true,
+		UseChatInfoDatabase:    true,
+		UseMessageDatabase:     true,
+		UseSecretChats:         false,
+		ApiId:                  int32(c.Int("appid")),
+		ApiHash:                c.String("apphash"),
+		SystemLanguageCode:     "en",
+		DeviceModel:            "Server",
+		SystemVersion:          "1.0.0",
+		ApplicationVersion:     "1.0.0",
+		EnableStorageOptimizer: true,
+		IgnoreFileNames:        false,
 	}
 
-AuthSuccess:
+	logVerbosity := client.WithLogVerbosity(&client.SetLogVerbosityLevelRequest{
+		NewVerbosityLevel: 0,
+	})
+
+	tdlibClient, err := client.NewClient(authorizer, logVerbosity)
+	if err != nil {
+		logrus.Fatalf("NewClient error: %s", err)
+	}
+
+	optionValue, err := tdlibClient.GetOption(&client.GetOptionRequest{
+		Name: "version",
+	})
+	if err != nil {
+		logrus.Fatalf("GetOption error: %s", err)
+	}
+
+	logrus.Infof("TDLib version: %s", optionValue.(*client.OptionValueString).Value)
+
+	me, err := tdlibClient.GetMe()
+	if err != nil {
+		logrus.Fatalf("GetMe error: %s", err)
+	}
+
+	logrus.Infof("Me: %s %s [%s]", me.FirstName, me.LastName, me.Username)
 
 	cn := cron.New()
 	_, err = cn.AddFunc(c.String("cron"), func() {
 		rand.Seed(time.Now().Unix())
 		name := data[rand.Intn(len(data)-1)]
 		logrus.Infof("update name to [%s]...", name)
-		_, err := tdCli.SetName(name, "")
+		_, err := tdlibClient.SetName(&client.SetNameRequest{
+			FirstName: name,
+		})
 		if err != nil {
 			logrus.Error(err)
 		}

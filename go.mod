@@ -3,10 +3,10 @@ module github.com/mritd/poetbot
 go 1.17
 
 require (
-	github.com/Arman92/go-tdlib v1.0.1-0.20210806020223-e1bab7be7026
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.3.0
+	github.com/zelenin/go-tdlib v0.4.1
 )
 
 require (
